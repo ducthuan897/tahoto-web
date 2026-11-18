@@ -921,11 +921,15 @@
       const acc = db.bank_accounts.find((a) => a.is_active) || db.bank_accounts[0];
       if (!acc) throw new Error("Chưa có tài khoản ngân hàng.");
       const emv_payload = buildVietQrPayload(acc, amount, description);
+      const cleanDesc = encodeURIComponent((description || "Thanh toan TAHOTO").trim());
+      const cleanHolder = encodeURIComponent((acc.account_name || "").trim());
+      const vietqr_image_url = `https://img.vietqr.io/image/${acc.bin_code}-${acc.account_number}-compact2.png?amount=${amount}&addInfo=${cleanDesc}&accountName=${cleanHolder}`;
       return {
         account: acc,
         amount,
         description,
         emv_payload,
+        vietqr_image_url,
       };
     }
 
@@ -1115,6 +1119,7 @@
 
   window.TAHOTO_BROWSER_DB = {
     handleLocalApi,
+    buildVietQrPayload,
     exportExcelInBrowser,
     importExcelInBrowser,
     downloadBrowserDbBackup,

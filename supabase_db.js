@@ -786,18 +786,28 @@
     if (path === "/api/vietqr" && method === "GET") {
       const amount = Number(url.searchParams.get("amount") || 0);
       const description = url.searchParams.get("description") || "Thanh toan TAHOTO";
-      const accs = await pgFetch("bank_accounts?select=*&order=is_active.desc,id.asc");
-      const acc = (accs || [])[0];
-      if (!acc) throw new Error("Chưa có tài khoản ngân hàng.");
-      // Reuse EMVCo generator via browser_db helper
-      const localQr = await window.TAHOTO_BROWSER_DB.handleLocalApi(
-        `/api/vietqr?amount=${amount}&description=${encodeURIComponent(description)}`
-      );
+      let accs = await pgFetch("bank_accounts?select=*&order=is_active.desc,id.asc");
+      let acc = (accs || [])[0];
+      if (!acc) {
+        acc = {
+          bank_code: "VTB",
+          bank_name: "Ngân hàng TMCP Công thương Việt Nam (VietinBank)",
+          account_number: "0856467178",
+          account_name: "DINH THI MY HOA",
+          bin_code: "970415",
+          is_active: true,
+        };
+      }
+      const emv_payload = window.TAHOTO_BROWSER_DB.buildVietQrPayload(acc, amount, description);
+      const cleanDesc = encodeURIComponent((description || "Thanh toan TAHOTO").trim());
+      const cleanHolder = encodeURIComponent((acc.account_name || "").trim());
+      const vietqr_image_url = `https://img.vietqr.io/image/${acc.bin_code}-${acc.account_number}-compact2.png?amount=${amount}&addInfo=${cleanDesc}&accountName=${cleanHolder}`;
       return {
         account: acc,
         amount,
         description,
-        emv_payload: localQr.emv_payload,
+        emv_payload,
+        vietqr_image_url,
       };
     }
 

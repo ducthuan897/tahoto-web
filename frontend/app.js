@@ -946,6 +946,9 @@ async function updatePosVietQrPreview() {
   }
 
   qrBox.classList.remove("hidden");
+  const errEl = document.getElementById("pos-qr-error");
+  if (errEl) errEl.classList.add("hidden");
+
   const cust = state.customers.find((c) => String(c.id) === String(state.posCustomerId));
   const desc = cust ? cust.name : "Khach le TAHOTO";
 
@@ -957,12 +960,37 @@ async function updatePosVietQrPreview() {
     document.getElementById("pos-qr-acc-num").textContent = `Số TK: ${qrData.account.account_number}`;
     document.getElementById("pos-qr-amount").textContent = formatVnd(payable);
 
+    const imgEl = document.getElementById("pos-qr-image");
     const canvas = document.getElementById("pos-qr-canvas");
-    if (canvas && window.QRCode) {
+
+    const cleanDesc = encodeURIComponent((desc || "Thanh toan TAHOTO").trim());
+    const cleanHolder = encodeURIComponent((qrData.account.account_name || "").trim());
+    const vietQrUrl =
+      qrData.vietqr_image_url ||
+      `https://img.vietqr.io/image/${qrData.account.bin_code}-${qrData.account.account_number}-qr_only.png?amount=${payable}&addInfo=${cleanDesc}&accountName=${cleanHolder}`;
+
+    if (imgEl) {
+      imgEl.onload = () => {
+        imgEl.classList.remove("hidden");
+        if (canvas) canvas.classList.add("hidden");
+      };
+      imgEl.onerror = () => {
+        imgEl.classList.add("hidden");
+        if (canvas && window.QRCode) {
+          canvas.classList.remove("hidden");
+          QRCode.toCanvas(canvas, qrData.emv_payload, { width: 170, margin: 1 });
+        }
+      };
+      imgEl.src = vietQrUrl;
+    } else if (canvas && window.QRCode) {
+      canvas.classList.remove("hidden");
       QRCode.toCanvas(canvas, qrData.emv_payload, { width: 170, margin: 1 });
     }
   } catch (err) {
-    qrBox.innerHTML = `<div class="text-xs text-red-600 p-2">${err.message}</div>`;
+    if (errEl) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    }
   }
 }
 
