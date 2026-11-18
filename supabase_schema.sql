@@ -222,3 +222,131 @@ ON CONFLICT (name) DO NOTHING;
 INSERT INTO public.bank_accounts (bank_code, bank_name, account_number, account_name, bin_code, is_active)
 VALUES ('VTB', 'Ngân hàng TMCP Công thương Việt Nam (VietinBank)', '0856467178', 'DINH THI MY HOA', '970415', TRUE)
 ON CONFLICT (account_number) DO NOTHING;
+
+-- =============================================================================
+-- DỮ LIỆU MẪU (KHÁCH HÀNG, HÀNG HÓA, THẺ KHO, HÓA ĐƠN & SỔ NỢ)
+-- =============================================================================
+DO $$
+DECLARE
+    now_ms BIGINT := (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT;
+    day_ms BIGINT := 86400000;
+    c1 BIGINT; c2 BIGINT; c3 BIGINT; c4 BIGINT;
+    p1 BIGINT; p2 BIGINT; p3 BIGINT; p4 BIGINT; p5 BIGINT; p6 BIGINT;
+    p7 BIGINT; p8 BIGINT; p9 BIGINT; p10 BIGINT; p11 BIGINT; p12 BIGINT;
+    inv1 BIGINT; inv2 BIGINT; inv3 BIGINT; inv4 BIGINT; inv5 BIGINT; inv6 BIGINT; inv7 BIGINT;
+BEGIN
+    -- Chỉ thêm dữ liệu mẫu nếu bảng products đang trống
+    IF NOT EXISTS (SELECT 1 FROM public.products LIMIT 1) THEN
+
+        -- 1. Khách hàng mẫu
+        INSERT INTO public.customers (name, phone, address, created_at, updated_at) VALUES
+            ('Nguyễn Văn An', '0901112233', 'Mai Hạ - Trường Phú - Lệ Thủy - Quảng Trị', now_ms, now_ms),
+            ('Trần Thị Bình', '0902223344', 'Trường Phú - Lệ Thủy - Quảng Trị', now_ms, now_ms),
+            ('Lê Quốc Cường', '0903334455', 'Ngã tư Mai Hạ - Quảng Trị', now_ms, now_ms),
+            ('Phạm Minh Đức', '0914556677', 'Xóm 3 - Mai Hạ - Quảng Trị', now_ms, now_ms)
+        ON CONFLICT (phone) DO NOTHING;
+
+        SELECT id INTO c1 FROM public.customers WHERE phone = '0901112233';
+        SELECT id INTO c2 FROM public.customers WHERE phone = '0902223344';
+        SELECT id INTO c3 FROM public.customers WHERE phone = '0903334455';
+        SELECT id INTO c4 FROM public.customers WHERE phone = '0914556677';
+
+        -- 2. Hàng hóa mẫu (12 mặt hàng tạp hóa phổ biến)
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Thùng Bia Huda 24 lon', 'Huda Beer 24 cans', '8935012413332', 'Bia, nước giải khát', 275000, 252000, 'Thùng', 45, 5, now_ms, now_ms) RETURNING id INTO p1;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Nước tăng lực RedBull 250ml', 'RedBull Energy Drink 250ml', '8934588012112', 'Bia, nước giải khát', 12000, 9500, 'Lon', 120, 5, now_ms, now_ms) RETURNING id INTO p2;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Lốc Sữa tươi tiệt trùng Vinamilk 180ml', 'Vinamilk Fresh Milk 4x180ml', '8934673100120', 'Sữa các loại', 32000, 27500, 'Lốc', 38, 5, now_ms, now_ms) RETURNING id INTO p3;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Sữa đặc Ông Thọ Đỏ 380g', 'Ong Tho Condensed Milk 380g', '8934673201117', 'Sữa các loại', 25000, 21000, 'Hộp', 50, 5, now_ms, now_ms) RETURNING id INTO p4;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Dầu ăn Neptune Light 1 Lít', 'Neptune Light Cooking Oil 1L', '8934707015116', 'Dầu ăn, nước chấm, gia vị', 58000, 49000, 'Chai', 28, 5, now_ms, now_ms) RETURNING id INTO p5;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Nước mắm Nam Ngư 750ml', 'Nam Ngu Fish Sauce 750ml', '8936017360117', 'Dầu ăn, nước chấm, gia vị', 42000, 35000, 'Chai', 32, 5, now_ms, now_ms) RETURNING id INTO p6;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Thùng Mì Hảo Hảo Tôm Chua Cay 30 gói', 'Hao Hao Instant Noodles 30 packs', '8934563138165', 'Mì, miến, cháo, phở', 118000, 106000, 'Thùng', 25, 5, now_ms, now_ms) RETURNING id INTO p7;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Mì Hảo Hảo Tôm Chua Cay 75g', 'Hao Hao Shrimp Sour Spicy 75g', '8934563138158', 'Mì, miến, cháo, phở', 4500, 3600, 'Gói', 200, 5, now_ms, now_ms) RETURNING id INTO p8;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Thuốc lá 555 State Express', 'Cigarette 555', '8935555555555', 'Thuốc lá', 45000, 37000, 'Gói', 85, 5, now_ms, now_ms) RETURNING id INTO p9;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Cà phê G7 3in1 Trung Nguyên (Hộp 21 gói)', 'G7 Instant Coffee 3in1', '8935024112217', 'Bánh kẹo các loại', 62000, 52000, 'Hộp', 4, 5, now_ms, now_ms) RETURNING id INTO p10;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Nước rửa chén Sunlight Chanh 750g', 'Sunlight Dishwashing Liquid 750g', '8934868121138', 'Vệ sinh nhà cửa', 29000, 23500, 'Chai', 3, 5, now_ms, now_ms) RETURNING id INTO p11;
+
+        INSERT INTO public.products (name, english_name, barcode, category_name, price, cost, unit, stock, min_stock_threshold, created_at, updated_at)
+        VALUES ('Dầu gội Clear Bạc Hà 630g', 'Clear Menthol Shampoo 630g', '8934868134527', 'Chăm sóc cá nhân', 165000, 142000, 'Chai', 14, 5, now_ms, now_ms) RETURNING id INTO p12;
+
+        -- 3. Thẻ kho đầu kỳ (stock_movements)
+        INSERT INTO public.stock_movements (product_id, movement_type, quantity_change, stock_before, stock_after, reference_code, note, created_at)
+        SELECT id, 'INITIAL', stock, 0, stock, 'SEED', 'Tồn kho đầu kỳ', now_ms FROM public.products;
+
+        -- 4. Hóa đơn mẫu (7 hóa đơn rải đều 6 ngày gần đây để lên biểu đồ Tổng quan)
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD1', now_ms - 5 * day_ms, 650000, 0, 650000, 588000, 'cash', 'cash', c1) RETURNING id INTO inv1;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv1, p1, 'Thùng Bia Huda 24 lon', 'Thùng', 2, 275000, 252000, 550000),
+            (inv1, p5, 'Dầu ăn Neptune Light 1 Lít', 'Chai', 1, 58000, 49000, 58000),
+            (inv1, p6, 'Nước mắm Nam Ngư 750ml', 'Chai', 1, 42000, 35000, 42000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD2', now_ms - 4 * day_ms, 264000, 0, 264000, 230500, 'bank_transfer', 'bank_transfer', c2) RETURNING id INTO inv2;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv2, p3, 'Lốc Sữa tươi tiệt trùng Vinamilk 180ml', 'Lốc', 3, 32000, 27500, 96000),
+            (inv2, p4, 'Sữa đặc Ông Thọ Đỏ 380g', 'Hộp', 2, 25000, 21000, 50000),
+            (inv2, p7, 'Thùng Mì Hảo Hảo Tôm Chua Cay 30 gói', 'Thùng', 1, 118000, 106000, 118000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD3', now_ms - 3 * day_ms, 1050000, 0, 1050000, 941000, 'debt', 'debt', c3) RETURNING id INTO inv3;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv3, p1, 'Thùng Bia Huda 24 lon', 'Thùng', 3, 275000, 252000, 825000),
+            (inv3, p9, 'Thuốc lá 555 State Express', 'Gói', 5, 45000, 37000, 225000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD4', now_ms - 2 * day_ms, 334000, 4000, 330000, 271000, 'cash', 'cash', NULL) RETURNING id INTO inv4;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv4, p2, 'Nước tăng lực RedBull 250ml', 'Lon', 10, 12000, 9500, 120000),
+            (inv4, p8, 'Mì Hảo Hảo Tôm Chua Cay 75g', 'Gói', 20, 4500, 3600, 90000),
+            (inv4, p10, 'Cà phê G7 3in1 Trung Nguyên (Hộp 21 gói)', 'Hộp', 2, 62000, 52000, 124000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD5', now_ms - 1 * day_ms, 339000, 0, 339000, 287000, 'bank_transfer', 'bank_transfer', c1) RETURNING id INTO inv5;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv5, p12, 'Dầu gội Clear Bạc Hà 630g', 'Chai', 1, 165000, 142000, 165000),
+            (inv5, p5, 'Dầu ăn Neptune Light 1 Lít', 'Chai', 2, 58000, 49000, 116000),
+            (inv5, p11, 'Nước rửa chén Sunlight Chanh 750g', 'Chai', 2, 29000, 23500, 58000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD6', now_ms - 7200000, 601000, 0, 601000, 538000, 'cash', 'cash', c4) RETURNING id INTO inv6;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv6, p1, 'Thùng Bia Huda 24 lon', 'Thùng', 1, 275000, 252000, 275000),
+            (inv6, p7, 'Thùng Mì Hảo Hảo Tôm Chua Cay 30 gói', 'Thùng', 2, 118000, 106000, 236000),
+            (inv6, p9, 'Thuốc lá 555 State Express', 'Gói', 2, 45000, 37000, 90000);
+
+        INSERT INTO public.invoices (code, date, subtotal_amount, discount_amount, total_amount, total_cost, payment_method, note, customer_id)
+        VALUES ('HD7', now_ms - 3600000, 424000, 0, 424000, 356000, 'debt', 'debt', c2) RETURNING id INTO inv7;
+        INSERT INTO public.invoice_items (invoice_id, product_id, product_name_snapshot, unit_snapshot, quantity, price, cost, sub_total) VALUES
+            (inv7, p5, 'Dầu ăn Neptune Light 1 Lít', 'Chai', 3, 58000, 49000, 174000),
+            (inv7, p6, 'Nước mắm Nam Ngư 750ml', 'Chai', 3, 42000, 35000, 126000),
+            (inv7, p10, 'Cà phê G7 3in1 Trung Nguyên (Hộp 21 gói)', 'Hộp', 2, 62000, 52000, 124000);
+
+        -- 5. Sổ nợ mẫu (2 khoản ghi nợ từ HD3 và HD7)
+        INSERT INTO public.debt_records (invoice_id, customer_id, customer_name, customer_phone, amount, paid_amount, note, created_at, is_settled)
+        VALUES
+            (inv3, c3, 'Lê Quốc Cường', '0903334455', 1050000, 0, 'Ghi nợ hóa đơn HD3', now_ms - 3 * day_ms, FALSE),
+            (inv7, c2, 'Trần Thị Bình', '0902223344', 424000, 0, 'Ghi nợ hóa đơn HD7', now_ms - 3600000, FALSE);
+
+    END IF;
+END
+$$;
