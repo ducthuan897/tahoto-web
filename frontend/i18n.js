@@ -11,6 +11,7 @@ const TRANSLATIONS = {
     tab_debts: "Sổ nợ",
     tab_customers: "Khách hàng",
     tab_more: "Báo cáo & Cài đặt",
+    tab_users: "Nhân sự & Phân quyền",
 
     // Overview
     overview_today: "Hôm nay",
@@ -134,6 +135,7 @@ const TRANSLATIONS = {
     tab_debts: "Debt Book",
     tab_customers: "Customers",
     tab_more: "Reports & Settings",
+    tab_users: "Users & Permissions",
 
     overview_today: "Today",
     overview_yesterday: "Yesterday",

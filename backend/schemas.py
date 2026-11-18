@@ -108,3 +108,26 @@ class BankAccountCreate(BaseModel):
 
 class BankAccountUpdate(BankAccountCreate):
     pass
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+    role: str = "cashier"
+    permissions_json: Optional[str] = None
+    is_active: bool = True
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    permissions_json: Optional[str] = None
+    is_active: Optional[bool] = None
+

@@ -811,6 +811,98 @@
       };
     }
 
+    // 10. Authentication & Users (RBAC on Supabase app_users table with fallback)
+    if (path === "/api/auth/login" && method === "POST") {
+      try {
+        const uname = (body.username || "").trim().toLowerCase();
+        const pwd = body.password || "";
+        const rows = await pgFetch(`app_users?username=eq.${encodeURIComponent(uname)}&select=*`);
+        if (rows && rows.length > 0) {
+          const user = rows[0];
+          if (user.is_active === false) throw new Error("Tài khoản này đang bị tạm khóa");
+          const hashed = await window.TAHOTO_BROWSER_DB.hashPasswordJS(pwd);
+          if (user.password_hash !== hashed && user.password_hash !== pwd) {
+            throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
+          }
+          return window.TAHOTO_BROWSER_DB.serializeAppUser(user);
+        }
+      } catch (err) {
+        if (String(err.message).includes("không chính xác") || String(err.message).includes("tạm khóa")) {
+          throw err;
+        }
+      }
+      return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
+    }
+
+    if (path === "/api/users" && method === "GET") {
+      try {
+        const rows = await pgFetch("app_users?select=*&order=id.asc");
+        if (rows && rows.length > 0) {
+          return rows.map((u) => window.TAHOTO_BROWSER_DB.serializeAppUser(u));
+        }
+      } catch (_) {}
+      return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
+    }
+
+    if (path === "/api/users" && method === "POST") {
+      try {
+        const uname = (body.username || "").trim().toLowerCase();
+        const hashed = await window.TAHOTO_BROWSER_DB.hashPasswordJS(body.password || "");
+        const created = await pgFetch("app_users", {
+          method: "POST",
+          body: {
+            username: uname,
+            password_hash: hashed,
+            full_name: (body.full_name || "").trim(),
+            role: body.role || "cashier",
+            permissions_json: body.permissions_json || "{}",
+            is_active: body.is_active !== false,
+            created_at: now,
+          },
+        });
+        return window.TAHOTO_BROWSER_DB.serializeAppUser(created[0]);
+      } catch (_) {
+        return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
+      }
+    }
+
+    const userMatch = path.match(/^\/api\/users\/(\d+)$/);
+    if (userMatch && method === "PUT") {
+      const uid = Number(userMatch[1]);
+      try {
+        const patch = {};
+        if (body.full_name && body.full_name.trim()) patch.full_name = body.full_name.trim();
+        if (body.role) patch.role = body.role;
+        if (body.password && body.password.trim()) {
+          patch.password_hash = await window.TAHOTO_BROWSER_DB.hashPasswordJS(body.password.trim());
+        }
+        if (body.permissions_json !== undefined && body.permissions_json !== null) {
+          patch.permissions_json = body.permissions_json;
+        }
+        if (body.is_active !== undefined && body.is_active !== null) {
+          patch.is_active = body.is_active;
+        }
+        const updated = await pgFetch(`app_users?id=eq.${uid}`, {
+          method: "PATCH",
+          body: patch,
+        });
+        if (updated && updated.length > 0) {
+          return window.TAHOTO_BROWSER_DB.serializeAppUser(updated[0]);
+        }
+      } catch (_) {}
+      return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
+    }
+
+    if (userMatch && method === "DELETE") {
+      const uid = Number(userMatch[1]);
+      try {
+        await pgFetch(`app_users?id=eq.${uid}`, { method: "DELETE" });
+        return { status: "deleted", id: uid };
+      } catch (_) {
+        return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
+      }
+    }
+
     return window.TAHOTO_BROWSER_DB.handleLocalApi(urlStr, options);
   }
 

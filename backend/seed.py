@@ -1,4 +1,6 @@
 """Database initialization and initial realistic seed data for Tạp Hóa Tổng Hợp Thọ Hòa (TAHOTO)."""
+import json
+import hashlib
 from sqlalchemy.orm import Session
 from .models import (
     Category,
@@ -10,8 +12,46 @@ from .models import (
     InvoiceItem,
     DebtRecord,
     StockMovement,
+    AppUser,
     now_millis,
 )
+
+def hash_password(raw: str) -> str:
+    return hashlib.sha256(f"tahoto_salt_{raw}".encode("utf-8")).hexdigest()
+
+
+DEFAULT_PERMISSIONS_BY_ROLE = {
+    "manager": {
+        "overview": {"view": True, "edit": True},
+        "sales": {"view": True, "edit": True},
+        "invoices": {"view": True, "edit": True},
+        "products": {"view": True, "edit": True},
+        "debts": {"view": True, "edit": True},
+        "customers": {"view": True, "edit": True},
+        "more": {"view": True, "edit": True},
+        "users": {"view": True, "edit": True},
+    },
+    "leader": {
+        "overview": {"view": True, "edit": False},
+        "sales": {"view": True, "edit": True},
+        "invoices": {"view": True, "edit": True},
+        "products": {"view": True, "edit": True},
+        "debts": {"view": True, "edit": True},
+        "customers": {"view": True, "edit": True},
+        "more": {"view": True, "edit": False},
+        "users": {"view": False, "edit": False},
+    },
+    "cashier": {
+        "overview": {"view": False, "edit": False},
+        "sales": {"view": True, "edit": True},
+        "invoices": {"view": True, "edit": False},
+        "products": {"view": True, "edit": False},
+        "debts": {"view": True, "edit": False},
+        "customers": {"view": True, "edit": True},
+        "more": {"view": False, "edit": False},
+        "users": {"view": False, "edit": False},
+    },
+}
 
 DEFAULT_CATEGORIES = [
     ("Bia, nước giải khát", "Beer and soft drinks"),
@@ -201,5 +241,26 @@ def seed_initial_data(db: Session):
                             is_settled=False,
                         )
                     )
+
+    # 7. Seed Default Users (Manager, Team Leader, Cashier)
+    if db.query(AppUser).count() == 0:
+        default_users = [
+            ("quanly", "123456", "Quản lý Cửa hàng", "manager"),
+            ("totruong", "123456", "Tổ trưởng Ca", "leader"),
+            ("thungan", "123456", "Nhân viên Thu ngân", "cashier"),
+        ]
+        for uname, pwd, fname, role in default_users:
+            perms = DEFAULT_PERMISSIONS_BY_ROLE.get(role, DEFAULT_PERMISSIONS_BY_ROLE["cashier"])
+            db.add(
+                AppUser(
+                    username=uname,
+                    password_hash=hash_password(pwd),
+                    full_name=fname,
+                    role=role,
+                    permissions_json=json.dumps(perms),
+                    is_active=True,
+                    created_at=now,
+                )
+            )
 
     db.commit()

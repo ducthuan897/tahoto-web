@@ -21,6 +21,10 @@ const state = {
   drafts: [],
   invoices: [],
   debts: [],
+  users: [],
+  currentUser: null,
+  selectedUserIdForPerms: null,
+  editingPermsDraft: null,
 
   // POS Cart state
   posSearch: "",
@@ -181,10 +185,135 @@ function handleDownloadDbClick(e) {
 }
 
 // ---------------------------------------------------------------------------
-// INITIALIZATION & NAVIGATION
+// AUTHENTICATION & RBAC PERMISSIONS
 // ---------------------------------------------------------------------------
-async function initApp() {
-  applyLanguageUI();
+const PERMISSION_MODULES = [
+  { key: "overview", name: "Tổng quan & Báo cáo doanh thu", desc: "Xem biểu đồ doanh thu, lợi nhuận, sản phẩm bán chạy và cảnh báo tồn kho" },
+  { key: "sales", name: "Bán hàng (POS)", desc: "Tạo đơn bán hàng, quét mã vạch, lưu hóa đơn nháp và thanh toán VietQR" },
+  { key: "invoices", name: "Lịch sử Hóa đơn", desc: "Tra cứu danh sách hóa đơn đã xuất, xem chi tiết và in lại hóa đơn" },
+  { key: "products", name: "Hàng hóa & Thẻ kho", desc: "Xem danh mục hàng hóa (Xem) / Thêm, sửa, xóa sản phẩm, điều chỉnh thẻ kho (Sửa)" },
+  { key: "debts", name: "Sổ Quản lý Công nợ", desc: "Xem danh sách nợ (Xem) / Thêm khoản nợ, thu nợ 1 phần, tất toán hoặc xóa nợ (Sửa)" },
+  { key: "customers", name: "Quản lý Khách hàng", desc: "Xem danh bạ khách hàng (Xem) / Thêm mới, cập nhật hoặc xóa khách hàng (Sửa)" },
+  { key: "more", name: "Báo cáo Excel & Cài đặt", desc: "Xem thông tin cài đặt (Xem) / Xuất-nhập Excel, quản lý tài khoản ngân hàng & kết nối DB (Sửa)" },
+  { key: "users", name: "Nhân sự & Phân quyền", desc: "Xem danh sách tài khoản (Xem) / Thêm tài khoản và tích chọn phân quyền Xem - Sửa (Sửa)" },
+];
+
+const ROLE_LABELS = {
+  manager: "Quản lý",
+  leader: "Tổ trưởng",
+  cashier: "Thu ngân",
+};
+
+const ROLE_DEFAULT_PERMS = {
+  manager: {
+    overview: { view: true, edit: true },
+    sales: { view: true, edit: true },
+    invoices: { view: true, edit: true },
+    products: { view: true, edit: true },
+    debts: { view: true, edit: true },
+    customers: { view: true, edit: true },
+    more: { view: true, edit: true },
+    users: { view: true, edit: true },
+  },
+  leader: {
+    overview: { view: true, edit: false },
+    sales: { view: true, edit: true },
+    invoices: { view: true, edit: true },
+    products: { view: true, edit: true },
+    debts: { view: true, edit: true },
+    customers: { view: true, edit: true },
+    more: { view: true, edit: false },
+    users: { view: false, edit: false },
+  },
+  cashier: {
+    overview: { view: false, edit: false },
+    sales: { view: true, edit: true },
+    invoices: { view: true, edit: false },
+    products: { view: true, edit: false },
+    debts: { view: true, edit: false },
+    customers: { view: true, edit: true },
+    more: { view: false, edit: false },
+    users: { view: false, edit: false },
+  },
+};
+
+function canView(moduleKey) {
+  const u = state.currentUser;
+  if (!u) return false;
+  if (u.role === "manager") return true;
+  const p = (u.permissions || {})[moduleKey];
+  return Boolean(p && (p.view || p.edit));
+}
+
+function canEdit(moduleKey) {
+  const u = state.currentUser;
+  if (!u) return false;
+  if (u.role === "manager") return true;
+  const p = (u.permissions || {})[moduleKey];
+  return Boolean(p && p.edit);
+}
+
+function applyAuthUI() {
+  const u = state.currentUser;
+  const overlay = document.getElementById("login-overlay");
+  if (!u) {
+    overlay?.classList.remove("hidden");
+    return;
+  }
+  overlay?.classList.add("hidden");
+
+  const badge = document.getElementById("header-user-badge");
+  const nameEl = document.getElementById("header-user-name");
+  const roleEl = document.getElementById("header-user-role");
+  if (badge && nameEl && roleEl) {
+    badge.classList.remove("hidden");
+    nameEl.textContent = u.full_name;
+    roleEl.textContent = ROLE_LABELS[u.role] || u.role;
+  }
+
+  // Show/hide navigation tabs according to view permissions
+  document.querySelectorAll(".nav-tab-btn").forEach((btn) => {
+    const tabKey = btn.getAttribute("data-tab");
+    const allowed = canView(tabKey);
+    btn.classList.toggle("hidden", !allowed);
+  });
+}
+
+async function submitLoginForm(e) {
+  e.preventDefault();
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+  const errEl = document.getElementById("login-error-msg");
+  if (errEl) errEl.classList.add("hidden");
+
+  try {
+    const user = await apiFetch("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+    state.currentUser = user;
+    sessionStorage.setItem("tahoto_auth_user", JSON.stringify(user));
+    document.getElementById("login-password").value = "";
+    applyAuthUI();
+    showToast(`Xin chào ${user.full_name} (${ROLE_LABELS[user.role] || user.role})!`);
+    await loadAllAppDataAndOpenFirstTab();
+  } catch (err) {
+    if (errEl) {
+      errEl.textContent = err.message;
+      errEl.classList.remove("hidden");
+    }
+  }
+}
+
+function handleLogout() {
+  state.currentUser = null;
+  sessionStorage.removeItem("tahoto_auth_user");
+  document.getElementById("login-username").value = "";
+  document.getElementById("login-password").value = "";
+  applyAuthUI();
+}
+
+async function loadAllAppDataAndOpenFirstTab() {
   await Promise.all([
     loadSystemInfo(),
     loadCategoriesAndUnits(),
@@ -193,7 +322,29 @@ async function initApp() {
     loadBankAccounts(),
     loadDrafts(),
   ]);
-  await switchTab("overview");
+  const tabOrder = ["overview", "sales", "invoices", "products", "debts", "customers", "more", "users"];
+  const firstAllowed = tabOrder.find((k) => canView(k)) || "sales";
+  await switchTab(firstAllowed);
+}
+
+// ---------------------------------------------------------------------------
+// INITIALIZATION & NAVIGATION
+// ---------------------------------------------------------------------------
+async function initApp() {
+  applyLanguageUI();
+  try {
+    const saved = sessionStorage.getItem("tahoto_auth_user");
+    if (saved) {
+      state.currentUser = JSON.parse(saved);
+    }
+  } catch (_) {}
+
+  if (!state.currentUser) {
+    applyAuthUI();
+    return;
+  }
+  applyAuthUI();
+  await loadAllAppDataAndOpenFirstTab();
 }
 
 function toggleLanguage() {
@@ -277,6 +428,10 @@ async function loadDrafts() {
 }
 
 async function switchTab(tabName) {
+  if (state.currentUser && !canView(tabName)) {
+    showToast("Tài khoản của bạn không được cấp quyền xem mục này", "warning");
+    return;
+  }
   state.activeTab = tabName;
   document.querySelectorAll(".tab-section").forEach((sec) => {
     sec.classList.add("hidden");
@@ -315,6 +470,8 @@ async function switchTab(tabName) {
   } else if (tabName === "more") {
     await loadBankAccounts();
     renderMoreSettings();
+  } else if (tabName === "users") {
+    await refreshUsersAndPermissions();
   }
 }
 
@@ -1331,6 +1488,7 @@ async function refreshProductsTable() {
     return;
   }
 
+  const canEditProd = canEdit("products");
   tbody.innerHTML = state.products
     .map((p) => {
       const isLow = p.stock <= p.min_stock_threshold;
@@ -1362,12 +1520,16 @@ async function refreshProductsTable() {
             <button onclick="openProductLedgerModal(${p.id})" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold">
               Thẻ kho
             </button>
-            <button onclick="openProductModal(${p.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold">
-              Sửa
-            </button>
-            <button onclick="confirmDeleteProduct(${p.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold">
-              Xóa
-            </button>
+            ${
+              canEditProd
+                ? `<button onclick="openProductModal(${p.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                    Sửa
+                  </button>
+                  <button onclick="confirmDeleteProduct(${p.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold">
+                    Xóa
+                  </button>`
+                : `<span class="text-xs text-slate-400 italic">Chỉ xem</span>`
+            }
           </td>
         </tr>
       `;
@@ -1391,6 +1553,10 @@ function handleProductLowStockToggle(e) {
 }
 
 function openProductModal(productId = null) {
+  if (!canEdit("products")) {
+    showToast("Tài khoản của bạn chỉ có quyền Xem hàng hóa, không có quyền Chỉnh sửa", "warning");
+    return;
+  }
   const modal = document.getElementById("product-modal");
   if (!modal) return;
   const prod = productId ? state.products.find((p) => p.id === productId) : null;
@@ -1511,6 +1677,10 @@ async function openQuickRestockModal(productId) {
 
 async function submitQuickStockAdjustment(e) {
   e.preventDefault();
+  if (!canEdit("products")) {
+    showToast("Tài khoản của bạn không có quyền điều chỉnh tồn kho", "warning");
+    return;
+  }
   const productId = document.getElementById("ledger-product-id").value;
   const qty = parseFloat(document.getElementById("ledger-adjust-qty").value || "0");
   const note = document.getElementById("ledger-adjust-note").value.trim();
@@ -1578,6 +1748,7 @@ function renderDebtsView() {
     return;
   }
 
+  const canEditDebt = canEdit("debts");
   tbody.innerHTML = state.debts
     .map((d) => {
       const daysOld = Math.max(0, Math.floor((Date.now() - d.created_at) / (1000 * 3600 * 24)));
@@ -1610,20 +1781,24 @@ function renderDebtsView() {
           </td>
           <td class="py-3 px-4 text-right whitespace-nowrap space-x-1">
             ${
-              !d.is_settled
-                ? `<button onclick="openPartialDebtModal(${d.id})" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold">
-                    Thu 1 phần
+              canEditDebt
+                ? `${
+                    !d.is_settled
+                      ? `<button onclick="openPartialDebtModal(${d.id})" class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold">
+                          Thu 1 phần
+                        </button>`
+                      : ""
+                  }
+                  <button onclick="toggleDebtSettle(${d.id})" class="px-2.5 py-1 rounded-lg ${
+                    d.is_settled ? "bg-slate-100 text-slate-600" : "bg-emerald-600 text-white hover:bg-emerald-700"
+                  } text-xs font-semibold">
+                    ${d.is_settled ? "Đánh dấu chưa thu" : "Tất toán"}
+                  </button>
+                  <button onclick="deleteDebtRecord(${d.id})" class="px-2 py-1 rounded-lg text-red-600 hover:bg-red-50 text-xs font-semibold">
+                    Xóa
                   </button>`
-                : ""
+                : `<span class="text-xs text-slate-400 italic">Chỉ xem</span>`
             }
-            <button onclick="toggleDebtSettle(${d.id})" class="px-2.5 py-1 rounded-lg ${
-              d.is_settled ? "bg-slate-100 text-slate-600" : "bg-emerald-600 text-white hover:bg-emerald-700"
-            } text-xs font-semibold">
-              ${d.is_settled ? "Đánh dấu chưa thu" : "Tất toán"}
-            </button>
-            <button onclick="deleteDebtRecord(${d.id})" class="px-2 py-1 rounded-lg text-red-600 hover:bg-red-50 text-xs font-semibold">
-              Xóa
-            </button>
           </td>
         </tr>
       `;
@@ -1632,6 +1807,10 @@ function renderDebtsView() {
 }
 
 function openDebtModal() {
+  if (!canEdit("debts")) {
+    showToast("Tài khoản của bạn chỉ có quyền Xem sổ nợ, không có quyền Thêm/Sửa", "warning");
+    return;
+  }
   const modal = document.getElementById("debt-modal");
   const custSelect = document.getElementById("debt-form-customer-pick");
   if (custSelect) {
@@ -1738,6 +1917,7 @@ async function refreshCustomers() {
     return;
   }
 
+  const canEditCust = canEdit("customers");
   tbody.innerHTML = state.customers
     .map(
       (c) => `
@@ -1752,12 +1932,16 @@ async function refreshCustomers() {
           ${formatVnd(c.outstanding_debt)}
         </td>
         <td class="py-3 px-4 text-right space-x-1">
-          <button onclick="openCustomerModal(${c.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold">
-            Sửa
-          </button>
-          <button onclick="deleteCustomer(${c.id})" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-xs font-semibold">
-            Xóa
-          </button>
+          ${
+            canEditCust
+              ? `<button onclick="openCustomerModal(${c.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold">
+                  Sửa
+                </button>
+                <button onclick="deleteCustomer(${c.id})" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-xs font-semibold">
+                  Xóa
+                </button>`
+              : `<span class="text-xs text-slate-400 italic">Chỉ xem</span>`
+          }
         </td>
       </tr>
     `
@@ -1771,6 +1955,10 @@ function handleCustomerSearch(e) {
 }
 
 function openCustomerModal(customerId = null) {
+  if (!canEdit("customers")) {
+    showToast("Tài khoản của bạn chỉ có quyền Xem khách hàng, không có quyền Thêm/Sửa", "warning");
+    return;
+  }
   const c = customerId ? state.customers.find((x) => x.id === customerId) : null;
   document.getElementById("customer-modal-title").textContent = c ? "Chỉnh sửa Khách hàng" : "Thêm Khách hàng mới";
   document.getElementById("cust-form-id").value = c ? c.id : "";
@@ -2058,6 +2246,297 @@ function closeBarcodeScannerModal() {
       .finally(() => {
         html5QrScanner = null;
       });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 9. USERS & 2-COLUMN PERMISSION MATRIX TAB (XEM / SỬA)
+// ---------------------------------------------------------------------------
+async function refreshUsersAndPermissions() {
+  state.users = await apiFetch("/api/users");
+  if (!state.selectedUserIdForPerms || !state.users.some((u) => u.id === state.selectedUserIdForPerms)) {
+    // Prefer selecting a non-manager user first so the manager can immediately configure subordinates
+    const sub = state.users.find((u) => u.role !== "manager") || state.users[0];
+    state.selectedUserIdForPerms = sub ? sub.id : null;
+  }
+  selectUserForPermissions(state.selectedUserIdForPerms);
+}
+
+function selectUserForPermissions(userId) {
+  state.selectedUserIdForPerms = userId;
+  const target = state.users.find((u) => u.id === userId);
+  if (target) {
+    state.editingPermsDraft = JSON.parse(JSON.stringify(target.permissions || ROLE_DEFAULT_PERMS[target.role] || ROLE_DEFAULT_PERMS.cashier));
+  } else {
+    state.editingPermsDraft = {};
+  }
+  renderUsersList();
+  renderPermissionsMatrix();
+}
+
+function renderUsersList() {
+  const container = document.getElementById("users-list-container");
+  if (!container) return;
+  const canEditUsers = canEdit("users");
+  const addBtn = document.getElementById("btn-add-user");
+  if (addBtn) addBtn.classList.toggle("hidden", !canEditUsers);
+
+  if (state.users.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-sm text-slate-400">Chưa có tài khoản nào</div>`;
+    return;
+  }
+
+  container.innerHTML = state.users
+    .map((u) => {
+      const isSelected = u.id === state.selectedUserIdForPerms;
+      const roleBadge =
+        u.role === "manager"
+          ? "bg-purple-100 text-purple-700"
+          : u.role === "leader"
+          ? "bg-blue-100 text-blue-700"
+          : "bg-emerald-100 text-emerald-700";
+
+      return `
+        <div
+          onclick="selectUserForPermissions(${u.id})"
+          class="p-4 cursor-pointer transition flex items-center justify-between gap-3 ${
+            isSelected ? "bg-indigo-50/70 border-l-4 border-l-indigo-600" : "hover:bg-slate-50"
+          }"
+        >
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900 text-sm">${u.full_name}</span>
+              <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${roleBadge}">
+                ${ROLE_LABELS[u.role] || u.role}
+              </span>
+              ${!u.is_active ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600">Đã khóa</span>` : ""}
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5 font-mono">@${u.username}</div>
+          </div>
+          ${
+            canEditUsers
+              ? `<div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
+                  <button onclick="openUserModal(${u.id})" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700">
+                    Sửa
+                  </button>
+                  ${
+                    u.role !== "manager"
+                      ? `<button onclick="deleteUserAccount(${u.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-600">
+                          Xóa
+                        </button>`
+                      : ""
+                  }
+                </div>`
+              : ""
+          }
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderPermissionsMatrix() {
+  const tbody = document.getElementById("permissions-matrix-tbody");
+  const titleEl = document.getElementById("perm-target-user-title");
+  const subEl = document.getElementById("perm-target-user-subtitle");
+  const saveBtn = document.getElementById("btn-save-user-perms");
+  const resetBtn = document.getElementById("btn-reset-role-perms");
+  if (!tbody) return;
+
+  const target = state.users.find((u) => u.id === state.selectedUserIdForPerms);
+  if (!target) {
+    tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-slate-400">Chọn một tài khoản bên trái để phân quyền</td></tr>`;
+    return;
+  }
+
+  if (titleEl) titleEl.textContent = `${target.full_name} (${ROLE_LABELS[target.role] || target.role})`;
+  const isTargetManager = target.role === "manager";
+  const canEditUsers = canEdit("users") && !isTargetManager;
+
+  if (subEl) {
+    subEl.textContent = isTargetManager
+      ? "Tài khoản Quản lý có toàn quyền Xem và Sửa tất cả các chức năng hệ thống."
+      : "Tích chọn cột Được Xem và cột Được Sửa để cấp quyền cho nhân sự này.";
+  }
+  if (saveBtn) saveBtn.disabled = !canEditUsers;
+  if (resetBtn) resetBtn.disabled = !canEditUsers;
+
+  tbody.innerHTML = PERMISSION_MODULES.map((mod) => {
+    const p = isTargetManager
+      ? { view: true, edit: true }
+      : (state.editingPermsDraft && state.editingPermsDraft[mod.key]) || { view: false, edit: false };
+
+    return `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="py-3.5 px-5 font-bold text-slate-800">${mod.name}</td>
+        <td class="py-3.5 px-5 text-xs text-slate-500">${mod.desc}</td>
+        <td class="py-3.5 px-4 text-center">
+          <input
+            type="checkbox"
+            ${p.view ? "checked" : ""}
+            ${!canEditUsers ? "disabled" : ""}
+            onchange="togglePermissionCheckbox('${mod.key}', 'view', this.checked)"
+            class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
+          />
+        </td>
+        <td class="py-3.5 px-4 text-center">
+          <input
+            type="checkbox"
+            ${p.edit ? "checked" : ""}
+            ${!canEditUsers ? "disabled" : ""}
+            onchange="togglePermissionCheckbox('${mod.key}', 'edit', this.checked)"
+            class="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:opacity-50"
+          />
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function togglePermissionCheckbox(moduleKey, colType, checked) {
+  if (!state.editingPermsDraft) state.editingPermsDraft = {};
+  if (!state.editingPermsDraft[moduleKey]) {
+    state.editingPermsDraft[moduleKey] = { view: false, edit: false };
+  }
+  if (colType === "edit") {
+    state.editingPermsDraft[moduleKey].edit = checked;
+    // If granted Edit permission, automatically grant View permission
+    if (checked) {
+      state.editingPermsDraft[moduleKey].view = true;
+    }
+  } else if (colType === "view") {
+    state.editingPermsDraft[moduleKey].view = checked;
+    // If revoking View permission, also revoke Edit permission
+    if (!checked) {
+      state.editingPermsDraft[moduleKey].edit = false;
+    }
+  }
+  renderPermissionsMatrix();
+}
+
+function applyDefaultRoleTemplate() {
+  const target = state.users.find((u) => u.id === state.selectedUserIdForPerms);
+  if (!target || target.role === "manager") return;
+  const tpl = ROLE_DEFAULT_PERMS[target.role] || ROLE_DEFAULT_PERMS.cashier;
+  state.editingPermsDraft = JSON.parse(JSON.stringify(tpl));
+  renderPermissionsMatrix();
+  showToast(`Đã áp dụng mẫu quyền mặc định của ${ROLE_LABELS[target.role]} (Bấm Lưu phân quyền để hoàn tất)`);
+}
+
+async function saveSelectedUserPermissions() {
+  const target = state.users.find((u) => u.id === state.selectedUserIdForPerms);
+  if (!target || target.role === "manager") return;
+
+  try {
+    const updated = await apiFetch(`/api/users/${target.id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        permissions_json: JSON.stringify(state.editingPermsDraft || {}),
+      }),
+    });
+    // If current logged-in user updated their own permissions
+    if (state.currentUser && state.currentUser.id === updated.id) {
+      state.currentUser = updated;
+      sessionStorage.setItem("tahoto_auth_user", JSON.stringify(updated));
+      applyAuthUI();
+    }
+    await refreshUsersAndPermissions();
+    showToast(`Đã lưu phân quyền cho ${updated.full_name}!`);
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+function openUserModal(userId = null) {
+  if (!canEdit("users")) {
+    showToast("Chỉ Quản lý mới có quyền thêm hoặc sửa tài khoản nhân sự", "warning");
+    return;
+  }
+  const u = userId ? state.users.find((x) => x.id === userId) : null;
+  document.getElementById("user-modal-title").textContent = u ? "Cập nhật Tài khoản Nhân sự" : "Thêm Tài khoản Nhân sự";
+  document.getElementById("user-form-id").value = u ? u.id : "";
+  const unameInput = document.getElementById("user-form-username");
+  unameInput.value = u ? u.username : "";
+  unameInput.disabled = Boolean(u);
+  document.getElementById("user-form-fullname").value = u ? u.full_name : "";
+  document.getElementById("user-form-role").value = u ? u.role : "cashier";
+  const pwdInput = document.getElementById("user-form-password");
+  pwdInput.value = "";
+  pwdInput.required = !u;
+  document.getElementById("user-form-password-label").textContent = u
+    ? "Mật khẩu mới (Để trống nếu giữ nguyên)"
+    : "Mật khẩu *";
+  document.getElementById("user-form-active").checked = u ? u.is_active !== false : true;
+  document.getElementById("user-modal")?.classList.remove("hidden");
+}
+
+function closeUserModal() {
+  document.getElementById("user-modal")?.classList.add("hidden");
+}
+
+async function submitUserForm(e) {
+  e.preventDefault();
+  const id = document.getElementById("user-form-id").value;
+  const username = document.getElementById("user-form-username").value.trim().toLowerCase();
+  const full_name = document.getElementById("user-form-fullname").value.trim();
+  const role = document.getElementById("user-form-role").value;
+  const password = document.getElementById("user-form-password").value;
+  const is_active = document.getElementById("user-form-active").checked;
+
+  try {
+    if (id) {
+      const target = state.users.find((x) => String(x.id) === String(id));
+      const roleChanged = target && target.role !== role;
+      const permsToSave = roleChanged
+        ? JSON.stringify(ROLE_DEFAULT_PERMS[role] || ROLE_DEFAULT_PERMS.cashier)
+        : undefined;
+
+      const updated = await apiFetch(`/api/users/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          full_name,
+          role,
+          password: password || undefined,
+          permissions_json: permsToSave,
+          is_active,
+        }),
+      });
+      showToast(`Đã cập nhật tài khoản ${updated.full_name}!`);
+      state.selectedUserIdForPerms = updated.id;
+    } else {
+      const defaultPerms = ROLE_DEFAULT_PERMS[role] || ROLE_DEFAULT_PERMS.cashier;
+      const created = await apiFetch("/api/users", {
+        method: "POST",
+        body: JSON.stringify({
+          username,
+          password,
+          full_name,
+          role,
+          permissions_json: JSON.stringify(defaultPerms),
+          is_active,
+        }),
+      });
+      showToast(`Đã tạo tài khoản ${created.full_name}!`);
+      state.selectedUserIdForPerms = created.id;
+    }
+    closeUserModal();
+    await refreshUsersAndPermissions();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function deleteUserAccount(userId) {
+  const u = state.users.find((x) => x.id === userId);
+  if (!u) return;
+  if (!confirm(`Bạn có chắc muốn xóa tài khoản "${u.full_name}" (@${u.username})?`)) return;
+  try {
+    await apiFetch(`/api/users/${userId}`, { method: "DELETE" });
+    showToast("Đã xóa tài khoản!");
+    state.selectedUserIdForPerms = null;
+    await refreshUsersAndPermissions();
+  } catch (err) {
+    showToast(err.message, "error");
   }
 }
 

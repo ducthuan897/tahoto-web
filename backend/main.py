@@ -1,4 +1,5 @@
 import os
+import json
 import datetime
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
@@ -22,6 +23,7 @@ from .models import (
     DebtPayment,
     BankAccount,
     InvoiceDraft,
+    AppUser,
     now_millis,
 )
 from .schemas import (
@@ -39,8 +41,11 @@ from .schemas import (
     DebtPaymentCreate,
     BankAccountCreate,
     BankAccountUpdate,
+    LoginRequest,
+    UserCreate,
+    UserUpdate,
 )
-from .seed import seed_initial_data
+from .seed import seed_initial_data, hash_password, DEFAULT_PERMISSIONS_BY_ROLE
 from .vietqr import POPULAR_VN_BANKS, build_vietqr_payload
 from .excel_service import export_full_excel_report, import_excel_workbook
 
@@ -1331,6 +1336,124 @@ def download_sqlite_backup():
         media_type="application/octet-stream",
         filename=f"tahoto_backup_{timestamp}.db",
     )
+
+
+# ---------------------------------------------------------------------------
+# AUTHENTICATION & USER PERMISSIONS (RBAC: QUẢN LÝ, TỔ TRƯỞNG, THU NGÂN)
+# ---------------------------------------------------------------------------
+def serialize_user(u: AppUser) -> dict:
+    try:
+        perms = json.loads(u.permissions_json or "{}")
+    except Exception:
+        perms = DEFAULT_PERMISSIONS_BY_ROLE.get(u.role, DEFAULT_PERMISSIONS_BY_ROLE["cashier"])
+    if u.role == "manager":
+        perms = DEFAULT_PERMISSIONS_BY_ROLE["manager"]
+    return {
+        "id": u.id,
+        "username": u.username,
+        "full_name": u.full_name,
+        "role": u.role,
+        "permissions": perms,
+        "is_active": u.is_active,
+        "created_at": u.created_at,
+    }
+
+
+@app.post("/api/auth/login")
+def login_user(payload: LoginRequest, db: Session = Depends(get_db)):
+    uname = (payload.username or "").strip().lower()
+    pwd = payload.password or ""
+    if not uname or not pwd:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập tên đăng nhập và mật khẩu")
+
+    user = db.query(AppUser).filter(func.lower(AppUser.username) == uname).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Tên đăng nhập hoặc mật khẩu không chính xác")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Tài khoản này đang bị tạm khóa")
+
+    hashed = hash_password(pwd)
+    if user.password_hash != hashed and user.password_hash != pwd:
+        raise HTTPException(status_code=401, detail="Tên đăng nhập hoặc mật khẩu không chính xác")
+
+    return serialize_user(user)
+
+
+@app.get("/api/users")
+def list_users(db: Session = Depends(get_db)):
+    users = db.query(AppUser).order_by(AppUser.id.asc()).all()
+    return [serialize_user(u) for u in users]
+
+
+@app.post("/api/users")
+def create_user(payload: UserCreate, db: Session = Depends(get_db)):
+    uname = (payload.username or "").strip().lower()
+    fname = (payload.full_name or "").strip()
+    pwd = payload.password or ""
+    role = (payload.role or "cashier").strip()
+    if role not in ("manager", "leader", "cashier"):
+        role = "cashier"
+
+    if not uname or not fname or not pwd:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập đầy đủ tên đăng nhập, mật khẩu và họ tên")
+
+    existing = db.query(AppUser).filter(func.lower(AppUser.username) == uname).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Tên đăng nhập đã tồn tại")
+
+    perms_str = payload.permissions_json
+    if not perms_str:
+        perms_str = json.dumps(DEFAULT_PERMISSIONS_BY_ROLE.get(role, DEFAULT_PERMISSIONS_BY_ROLE["cashier"]))
+
+    u = AppUser(
+        username=uname,
+        password_hash=hash_password(pwd),
+        full_name=fname,
+        role=role,
+        permissions_json=perms_str,
+        is_active=payload.is_active,
+        created_at=now_millis(),
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return serialize_user(u)
+
+
+@app.put("/api/users/{user_id}")
+def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)):
+    u = db.query(AppUser).filter(AppUser.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    if payload.full_name is not None and payload.full_name.strip():
+        u.full_name = payload.full_name.strip()
+    if payload.role is not None and payload.role in ("manager", "leader", "cashier"):
+        u.role = payload.role
+    if payload.password is not None and payload.password.strip():
+        u.password_hash = hash_password(payload.password.strip())
+    if payload.permissions_json is not None:
+        u.permissions_json = payload.permissions_json
+    if payload.is_active is not None:
+        u.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(u)
+    return serialize_user(u)
+
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    u = db.query(AppUser).filter(AppUser.id == user_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+    if u.role == "manager":
+        mgr_count = db.query(func.count(AppUser.id)).filter(AppUser.role == "manager").scalar() or 0
+        if mgr_count <= 1:
+            raise HTTPException(status_code=400, detail="Không thể xóa tài khoản Quản lý duy nhất của hệ thống")
+    db.delete(u)
+    db.commit()
+    return {"status": "deleted", "id": user_id}
 
 
 # ---------------------------------------------------------------------------

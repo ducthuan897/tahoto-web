@@ -197,6 +197,72 @@
       }
     });
 
+    const defaultPerms = {
+      manager: {
+        overview: { view: true, edit: true },
+        sales: { view: true, edit: true },
+        invoices: { view: true, edit: true },
+        products: { view: true, edit: true },
+        debts: { view: true, edit: true },
+        customers: { view: true, edit: true },
+        more: { view: true, edit: true },
+        users: { view: true, edit: true },
+      },
+      leader: {
+        overview: { view: true, edit: false },
+        sales: { view: true, edit: true },
+        invoices: { view: true, edit: true },
+        products: { view: true, edit: true },
+        debts: { view: true, edit: true },
+        customers: { view: true, edit: true },
+        more: { view: true, edit: false },
+        users: { view: false, edit: false },
+      },
+      cashier: {
+        overview: { view: false, edit: false },
+        sales: { view: true, edit: true },
+        invoices: { view: true, edit: false },
+        products: { view: true, edit: false },
+        debts: { view: true, edit: false },
+        customers: { view: true, edit: true },
+        more: { view: false, edit: false },
+        users: { view: false, edit: false },
+      },
+    };
+
+    const app_users = [
+      {
+        id: 1,
+        username: "quanly",
+        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        full_name: "Quản lý Cửa hàng",
+        role: "manager",
+        permissions_json: JSON.stringify(defaultPerms.manager),
+        is_active: true,
+        created_at: now,
+      },
+      {
+        id: 2,
+        username: "totruong",
+        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        full_name: "Tổ trưởng Ca",
+        role: "leader",
+        permissions_json: JSON.stringify(defaultPerms.leader),
+        is_active: true,
+        created_at: now,
+      },
+      {
+        id: 3,
+        username: "thungan",
+        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        full_name: "Nhân viên Thu ngân",
+        role: "cashier",
+        permissions_json: JSON.stringify(defaultPerms.cashier),
+        is_active: true,
+        created_at: now,
+      },
+    ];
+
     return {
       categories,
       units,
@@ -208,6 +274,42 @@
       debt_records,
       bank_accounts,
       invoice_drafts: [],
+      app_users,
+    };
+  }
+
+  async function hashPasswordJS(raw) {
+    const msgBuffer = new TextEncoder().encode(`tahoto_salt_${raw}`);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function serializeAppUser(u) {
+    let perms = {};
+    try {
+      perms = JSON.parse(u.permissions_json || "{}");
+    } catch (_) {}
+    if (u.role === "manager") {
+      perms = {
+        overview: { view: true, edit: true },
+        sales: { view: true, edit: true },
+        invoices: { view: true, edit: true },
+        products: { view: true, edit: true },
+        debts: { view: true, edit: true },
+        customers: { view: true, edit: true },
+        more: { view: true, edit: true },
+        users: { view: true, edit: true },
+      };
+    }
+    return {
+      id: u.id,
+      username: u.username,
+      full_name: u.full_name,
+      role: u.role,
+      permissions: perms,
+      is_active: u.is_active !== false,
+      created_at: u.created_at,
     };
   }
 
@@ -215,7 +317,12 @@
     try {
       const raw = localStorage.getItem(DB_STORAGE_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (!parsed.app_users || parsed.app_users.length === 0) {
+          parsed.app_users = createSeedDb().app_users;
+          saveDb(parsed);
+        }
+        return parsed;
       }
     } catch (_) {}
     const seeded = createSeedDb();
@@ -933,6 +1040,80 @@
       };
     }
 
+    // 10. Authentication & Users (RBAC)
+    if (path === "/api/auth/login" && method === "POST") {
+      const uname = (body.username || "").trim().toLowerCase();
+      const pwd = body.password || "";
+      const user = (db.app_users || []).find((u) => u.username.toLowerCase() === uname);
+      if (!user) throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
+      if (user.is_active === false) throw new Error("Tài khoản này đang bị tạm khóa");
+      const hashed = await hashPasswordJS(pwd);
+      if (user.password_hash !== hashed && user.password_hash !== pwd) {
+        throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
+      }
+      return serializeAppUser(user);
+    }
+
+    if (path === "/api/users" && method === "GET") {
+      return (db.app_users || []).map((u) => serializeAppUser(u));
+    }
+
+    if (path === "/api/users" && method === "POST") {
+      const uname = (body.username || "").trim().toLowerCase();
+      if (!uname || !body.password || !body.full_name) {
+        throw new Error("Vui lòng nhập đầy đủ tên đăng nhập, mật khẩu và họ tên");
+      }
+      if ((db.app_users || []).some((u) => u.username.toLowerCase() === uname)) {
+        throw new Error("Tên đăng nhập đã tồn tại");
+      }
+      const hashed = await hashPasswordJS(body.password);
+      const u = {
+        id: nextId(db.app_users),
+        username: uname,
+        password_hash: hashed,
+        full_name: body.full_name.trim(),
+        role: body.role || "cashier",
+        permissions_json: body.permissions_json || "{}",
+        is_active: body.is_active !== false,
+        created_at: now,
+      };
+      db.app_users.push(u);
+      saveDb(db);
+      return serializeAppUser(u);
+    }
+
+    const userMatch = path.match(/^\/api\/users\/(\d+)$/);
+    if (userMatch && method === "PUT") {
+      const uid = Number(userMatch[1]);
+      const u = (db.app_users || []).find((x) => x.id === uid);
+      if (!u) throw new Error("Không tìm thấy người dùng");
+      if (body.full_name && body.full_name.trim()) u.full_name = body.full_name.trim();
+      if (body.role) u.role = body.role;
+      if (body.password && body.password.trim()) {
+        u.password_hash = await hashPasswordJS(body.password.trim());
+      }
+      if (body.permissions_json !== undefined && body.permissions_json !== null) {
+        u.permissions_json = body.permissions_json;
+      }
+      if (body.is_active !== undefined && body.is_active !== null) {
+        u.is_active = body.is_active;
+      }
+      saveDb(db);
+      return serializeAppUser(u);
+    }
+
+    if (userMatch && method === "DELETE") {
+      const uid = Number(userMatch[1]);
+      const u = (db.app_users || []).find((x) => x.id === uid);
+      if (!u) throw new Error("Không tìm thấy người dùng");
+      if (u.role === "manager" && (db.app_users || []).filter((x) => x.role === "manager").length <= 1) {
+        throw new Error("Không thể xóa tài khoản Quản lý duy nhất của hệ thống");
+      }
+      db.app_users = (db.app_users || []).filter((x) => x.id !== uid);
+      saveDb(db);
+      return { status: "deleted", id: uid };
+    }
+
     throw new Error(`Endpoint not mocked: ${method} ${path}`);
   }
 
@@ -1120,6 +1301,8 @@
   window.TAHOTO_BROWSER_DB = {
     handleLocalApi,
     buildVietQrPayload,
+    hashPasswordJS,
+    serializeAppUser,
     exportExcelInBrowser,
     importExcelInBrowser,
     downloadBrowserDbBackup,

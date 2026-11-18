@@ -196,3 +196,17 @@ class InvoiceDraft(Base):
     customer_id = Column(Integer, nullable=True)
     customer_name = Column(String(200), nullable=True)
     note = Column(String(255), nullable=True, default="")
+
+
+class AppUser(Base):
+    __tablename__ = "app_users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(200), nullable=False)
+    role = Column(String(50), nullable=False, default="cashier", index=True)  # manager | leader | cashier
+    permissions_json = Column(Text, nullable=False, default="{}")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(BigInteger, nullable=False, default=now_millis)
+
