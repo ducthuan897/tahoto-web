@@ -131,6 +131,9 @@ function showToast(message, type = "success") {
 let isStaticPagesMode = window.location.hostname.endsWith("github.io");
 
 async function apiFetch(url, options = {}) {
+  if (window.TAHOTO_SUPABASE && window.TAHOTO_SUPABASE.getConfig().isConfigured) {
+    return window.TAHOTO_SUPABASE.handleSupabaseApi(url, options);
+  }
   if (isStaticPagesMode && window.TAHOTO_BROWSER_DB) {
     return window.TAHOTO_BROWSER_DB.handleLocalApi(url, options);
   }
@@ -1828,6 +1831,53 @@ function renderMoreSettings() {
   if (state.systemInfo) {
     document.getElementById("more-db-engine-label").textContent = state.systemInfo.database_engine;
   }
+
+  if (window.TAHOTO_SUPABASE) {
+    const cfg = window.TAHOTO_SUPABASE.getConfig();
+    const urlInput = document.getElementById("supabase-url-input");
+    const statusBadge = document.getElementById("supabase-status-badge");
+    if (urlInput && cfg.url) urlInput.value = cfg.url;
+    if (statusBadge) {
+      if (cfg.isConfigured) {
+        statusBadge.textContent = "Đã kết nối Supabase PostgreSQL";
+        statusBadge.className = "px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700";
+      } else {
+        statusBadge.textContent = "Chưa kết nối";
+        statusBadge.className = "px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-100 text-slate-600";
+      }
+    }
+  }
+}
+
+async function saveSupabaseConfig(e) {
+  e.preventDefault();
+  const url = document.getElementById("supabase-url-input").value.trim();
+  const key = document.getElementById("supabase-key-input").value.trim();
+  if (!url || !key) {
+    showToast("Vui lòng nhập đầy đủ Project URL và API Key", "warning");
+    return;
+  }
+  try {
+    showToast("Đang kiểm tra kết nối PostgreSQL...");
+    await window.TAHOTO_SUPABASE.testConnection(url, key);
+    window.TAHOTO_SUPABASE.setConfig(url, key);
+    document.getElementById("supabase-key-input").value = "";
+    showToast("Đã kết nối Supabase Cloud PostgreSQL thành công!");
+    await initApp();
+    await switchTab("more");
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function disconnectSupabaseConfig() {
+  if (!confirm("Bạn muốn ngắt kết nối Supabase Cloud PostgreSQL trên trình duyệt này?")) return;
+  window.TAHOTO_SUPABASE.setConfig("", "");
+  document.getElementById("supabase-url-input").value = "";
+  document.getElementById("supabase-key-input").value = "";
+  showToast("Đã ngắt kết nối Supabase.");
+  await initApp();
+  await switchTab("more");
 }
 
 function openBankModal(bankId = null) {
