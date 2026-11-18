@@ -1426,6 +1426,13 @@ def update_user(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)
     if not u:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
+    if payload.username is not None and payload.username.strip():
+        new_uname = payload.username.strip().lower()
+        if new_uname != u.username.lower():
+            dup = db.query(AppUser).filter(func.lower(AppUser.username) == new_uname, AppUser.id != user_id).first()
+            if dup:
+                raise HTTPException(status_code=409, detail="Tên đăng nhập đã tồn tại")
+            u.username = new_uname
     if payload.full_name is not None and payload.full_name.strip():
         u.full_name = payload.full_name.strip()
     if payload.role is not None and payload.role in ("manager", "leader", "cashier"):

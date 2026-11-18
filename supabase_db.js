@@ -871,6 +871,14 @@
       const uid = Number(userMatch[1]);
       try {
         const patch = {};
+        if (body.username && body.username.trim()) {
+          const newUname = body.username.trim().toLowerCase();
+          const dup = await pgFetch(`app_users?username=eq.${encodeURIComponent(newUname)}&id=neq.${uid}&select=id`);
+          if (dup && dup.length > 0) {
+            throw new Error("Tên đăng nhập đã tồn tại");
+          }
+          patch.username = newUname;
+        }
         if (body.full_name && body.full_name.trim()) patch.full_name = body.full_name.trim();
         if (body.role) patch.role = body.role;
         if (body.password && body.password.trim()) {

@@ -2491,7 +2491,7 @@ function openUserModal(userId = null) {
   document.getElementById("user-form-id").value = u ? u.id : "";
   const unameInput = document.getElementById("user-form-username");
   unameInput.value = u ? u.username : "";
-  unameInput.disabled = Boolean(u);
+  unameInput.disabled = false;
   document.getElementById("user-form-fullname").value = u ? u.full_name : "";
   document.getElementById("user-form-role").value = u ? u.role : "cashier";
   const pwdInput = document.getElementById("user-form-password");
@@ -2528,6 +2528,7 @@ async function submitUserForm(e) {
       const updated = await apiFetch(`/api/users/${id}`, {
         method: "PUT",
         body: JSON.stringify({
+          username,
           full_name,
           role,
           password: password || undefined,
@@ -2535,6 +2536,11 @@ async function submitUserForm(e) {
           is_active,
         }),
       });
+      if (state.currentUser && state.currentUser.id === updated.id) {
+        state.currentUser = updated;
+        sessionStorage.setItem("tahoto_auth_user", JSON.stringify(updated));
+        applyAuthUI();
+      }
       showToast(`Đã cập nhật tài khoản ${updated.full_name}!`);
       state.selectedUserIdForPerms = updated.id;
     } else {

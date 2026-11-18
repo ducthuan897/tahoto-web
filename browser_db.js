@@ -1102,6 +1102,15 @@
       const uid = Number(userMatch[1]);
       const u = (db.app_users || []).find((x) => x.id === uid);
       if (!u) throw new Error("Không tìm thấy người dùng");
+      if (body.username && body.username.trim()) {
+        const newUname = body.username.trim().toLowerCase();
+        if (newUname !== u.username.toLowerCase()) {
+          if ((db.app_users || []).some((x) => x.id !== uid && x.username.toLowerCase() === newUname)) {
+            throw new Error("Tên đăng nhập đã tồn tại");
+          }
+          u.username = newUname;
+        }
+      }
       if (body.full_name && body.full_name.trim()) u.full_name = body.full_name.trim();
       if (body.role) u.role = body.role;
       if (body.password && body.password.trim()) {
