@@ -15,11 +15,12 @@
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
     /* Custom scrollbar */
     ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
     }
     ::-webkit-scrollbar-track {
       background: #f1f5f9;
@@ -30,6 +31,22 @@
     }
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
+    }
+
+    /* Hide scrollbar for horizontal pill nav on mobile */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Prevent iOS zoom on form inputs */
+    @media (max-width: 640px) {
+      input, select, textarea {
+        font-size: 16px !important;
+      }
     }
 
     /* Receipt Print Styling */
@@ -59,67 +76,82 @@
   <!-- Toast Container -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
 
-  <!-- Top Header -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
-    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-      <!-- Brand -->
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-extrabold text-xl flex items-center justify-center shadow-sm">
-          T
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-extrabold text-lg tracking-tight text-slate-900" data-i18n="app_name">TAHOTO</span>
-            <span id="header-db-badge" class="hidden sm:inline-block px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              SQLite Enterprise (WAL)
-            </span>
+  <!-- Top Header (Responsive 2-tier on Mobile, 1-tier on Desktop) -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-[1600px] mx-auto px-3 sm:px-6 py-2 sm:py-0 sm:h-16 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <!-- Top Row on Mobile: Brand + User Profile & Actions -->
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-extrabold text-lg sm:text-xl flex items-center justify-center shadow-sm shrink-0">
+            T
           </div>
-          <div class="text-xs text-slate-500 font-medium" data-i18n="app_subtitle">Tạp Hóa Tổng Hợp Thọ Hòa</div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <span class="font-extrabold text-base sm:text-lg tracking-tight text-slate-900" data-i18n="app_name">TAHOTO</span>
+              <span id="header-db-badge" class="hidden xl:inline-block px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 truncate max-w-[160px]">
+                SQLite Enterprise (WAL)
+              </span>
+            </div>
+            <div class="text-[11px] sm:text-xs text-slate-500 font-medium truncate" data-i18n="app_subtitle">Tạp Hóa Tổng Hợp Thọ Hòa</div>
+          </div>
+        </div>
+
+        <!-- Mobile User Profile & Language Actions -->
+        <div class="flex sm:hidden items-center gap-1.5 shrink-0">
+          <div id="header-user-badge-mobile" class="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[11px]">
+            <span id="header-user-role-mobile" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700"></span>
+          </div>
+          <button onclick="toggleLanguage()" class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700">
+            <span id="lang-toggle-label-mobile">VI</span>
+          </button>
+          <button onclick="handleLogout()" title="Đăng xuất" class="px-2 py-1 rounded-lg border border-red-200 bg-red-50 text-[11px] font-bold text-red-600">
+            Thoát
+          </button>
         </div>
       </div>
 
-      <!-- Navigation Tabs -->
-      <nav class="flex items-center gap-1 overflow-x-auto py-1">
-        <button onclick="switchTab('overview')" data-tab="overview" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+      <!-- Navigation Tabs (Horizontal Scrollable on Mobile/Tablet) -->
+      <nav class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1 border-t sm:border-t-0 border-slate-100 -mx-3 px-3 sm:mx-0 sm:px-0">
+        <button onclick="switchTab('overview')" data-tab="overview" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>📊</span>
           <span data-i18n="tab_overview">Tổng quan</span>
         </button>
-        <button onclick="switchTab('sales')" data-tab="sales" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('sales')" data-tab="sales" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>🛒</span>
           <span data-i18n="tab_sales">Bán hàng (POS)</span>
         </button>
-        <button onclick="switchTab('invoices')" data-tab="invoices" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('invoices')" data-tab="invoices" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>🧾</span>
           <span data-i18n="tab_invoices">Hóa đơn</span>
         </button>
-        <button onclick="switchTab('products')" data-tab="products" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('products')" data-tab="products" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>📦</span>
           <span data-i18n="tab_products">Hàng hóa</span>
           <span id="nav-low-stock-badge" class="hidden px-1.5 py-0.2 bg-amber-500 text-white text-[10px] font-bold rounded-full">0</span>
         </button>
-        <button onclick="switchTab('debts')" data-tab="debts" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('debts')" data-tab="debts" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>📒</span>
           <span data-i18n="tab_debts">Sổ nợ</span>
           <span id="nav-debt-badge" class="hidden px-1.5 py-0.2 bg-red-500 text-white text-[10px] font-bold rounded-full">0</span>
         </button>
-        <button onclick="switchTab('customers')" data-tab="customers" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('customers')" data-tab="customers" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>👥</span>
           <span data-i18n="tab_customers">Khách hàng</span>
         </button>
-        <button onclick="switchTab('more')" data-tab="more" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('more')" data-tab="more" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>⚙️</span>
           <span data-i18n="tab_more">Báo cáo & Cài đặt</span>
         </button>
-        <button onclick="switchTab('users')" data-tab="users" id="nav-tab-users" class="nav-tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap">
+        <button onclick="switchTab('users')" data-tab="users" id="nav-tab-users" class="nav-tab-btn px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span>🛡️</span>
           <span data-i18n="tab_users">Nhân sự & Phân quyền</span>
         </button>
       </nav>
 
-      <!-- Language & User Account Profile -->
-      <div class="flex items-center gap-2">
-        <div id="header-user-badge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
-          <span id="header-user-name" class="font-bold text-slate-800"></span>
+      <!-- Desktop Language & User Account Profile -->
+      <div class="hidden sm:flex items-center gap-2 shrink-0">
+        <div id="header-user-badge" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+          <span id="header-user-name" class="font-bold text-slate-800 max-w-[120px] truncate"></span>
           <span id="header-user-role" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700"></span>
         </div>
         <button onclick="toggleLanguage()" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition">
@@ -133,7 +165,7 @@
   </header>
 
   <!-- Main Workspace Container -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-6">
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-24 sm:pb-8">
 
     <!-- =================================================================== -->
     <!-- TAB 1: OVERVIEW (TỔNG QUAN)                                         -->
@@ -158,27 +190,27 @@
         </div>
       </div>
 
-      <!-- KPI Summary Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_revenue">Tổng doanh thu</div>
-          <div id="kpi-revenue" class="text-2xl font-extrabold text-indigo-600 mt-1">0 ₫</div>
-          <div class="text-xs text-slate-500 mt-1">Số đơn: <span id="kpi-orders" class="font-semibold text-slate-700">0 đơn</span></div>
+      <!-- KPI Summary Cards (2x2 on Phone, 4 cols on Desktop) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_revenue">Tổng doanh thu</div>
+          <div id="kpi-revenue" class="text-lg sm:text-2xl font-extrabold text-indigo-600 mt-1 truncate">0 ₫</div>
+          <div class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Số đơn: <span id="kpi-orders" class="font-semibold text-slate-700">0 đơn</span></div>
         </div>
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_profit">Lợi nhuận gộp</div>
-          <div id="kpi-profit" class="text-2xl font-extrabold text-emerald-600 mt-1">0 ₫</div>
-          <div class="text-xs text-slate-500 mt-1">Doanh thu trừ giá vốn</div>
+        <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_profit">Lợi nhuận gộp</div>
+          <div id="kpi-profit" class="text-lg sm:text-2xl font-extrabold text-emerald-600 mt-1 truncate">0 ₫</div>
+          <div class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Doanh thu trừ giá vốn</div>
         </div>
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_cost">Tổng giá vốn</div>
-          <div id="kpi-cost" class="text-2xl font-extrabold text-slate-800 mt-1">0 ₫</div>
-          <div class="text-xs text-slate-500 mt-1">Giá vốn hàng bán trong kỳ</div>
+        <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div class="text-[11px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider" data-i18n="overview_cost">Tổng giá vốn</div>
+          <div id="kpi-cost" class="text-lg sm:text-2xl font-extrabold text-slate-800 mt-1 truncate">0 ₫</div>
+          <div class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Giá vốn hàng bán</div>
         </div>
-        <div onclick="switchTab('debts')" class="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm cursor-pointer hover:border-amber-400 transition">
-          <div class="text-xs font-semibold text-amber-700 uppercase tracking-wider" data-i18n="overview_debt_outstanding">Công nợ chưa thu</div>
-          <div id="kpi-debt" class="text-2xl font-extrabold text-amber-600 mt-1">0 ₫</div>
-          <div id="kpi-debt-count" class="text-xs text-amber-700 font-medium mt-1">0 khoản chưa thu</div>
+        <div onclick="switchTab('debts')" class="bg-white p-3.5 sm:p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm cursor-pointer hover:border-amber-400 transition">
+          <div class="text-[11px] sm:text-xs font-semibold text-amber-700 uppercase tracking-wider" data-i18n="overview_debt_outstanding">Công nợ chưa thu</div>
+          <div id="kpi-debt" class="text-lg sm:text-2xl font-extrabold text-amber-600 mt-1 truncate">0 ₫</div>
+          <div id="kpi-debt-count" class="text-[11px] sm:text-xs text-amber-700 font-medium mt-0.5">0 khoản chưa thu</div>
         </div>
       </div>
 
@@ -286,12 +318,12 @@
             <div id="pos-category-pills" class="flex items-center gap-2 overflow-x-auto pb-1"></div>
           </div>
 
-          <!-- Product Cards Grid -->
-          <div id="pos-product-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5"></div>
+          <!-- Product Cards Grid (2 cols on Phone for fast thumb tapping) -->
+          <div id="pos-product-grid" class="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 sm:gap-3.5"></div>
         </div>
 
         <!-- Right: Cart & Checkout Panel (5 cols) -->
-        <div class="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-20">
+        <div id="pos-cart-panel" class="lg:col-span-5 xl:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:sticky lg:top-20">
           <!-- Cart Header -->
           <div class="px-4 py-3.5 bg-slate-900 text-white flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -423,6 +455,23 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Mobile Floating Bottom Cart Bar (Only visible on < lg screens when in POS tab) -->
+      <div id="pos-mobile-cart-bar" class="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-slate-900 text-white px-4 py-3 shadow-2xl border-t border-slate-700 flex items-center justify-between gap-3">
+        <div onclick="scrollToMobileCart()" class="cursor-pointer">
+          <div class="text-[11px] text-slate-300 font-medium">
+            Giỏ hàng: <span id="pos-mobile-bar-count" class="font-bold text-white">0 món</span>
+          </div>
+          <div id="pos-mobile-bar-total" class="text-base font-extrabold text-emerald-400">0 ₫</div>
+        </div>
+        <button
+          type="button"
+          onclick="scrollToMobileCart()"
+          class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-md shrink-0"
+        >
+          Xem giỏ & Thanh toán ↓
+        </button>
       </div>
     </section>
 
@@ -820,10 +869,10 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase">
-                  <th class="py-3.5 px-5">Phân hệ / Chức năng</th>
-                  <th class="py-3.5 px-5">Mô tả phạm vi quyền</th>
-                  <th class="py-3.5 px-4 text-center w-28">Được Xem</th>
-                  <th class="py-3.5 px-4 text-center w-28">Được Sửa</th>
+                  <th class="py-3 px-3 sm:px-5">Phân hệ / Chức năng</th>
+                  <th class="hidden sm:table-cell py-3.5 px-5">Mô tả phạm vi quyền</th>
+                  <th class="py-3 px-2 sm:px-4 text-center w-20 sm:w-28">Được Xem</th>
+                  <th class="py-3 px-2 sm:px-4 text-center w-20 sm:w-28">Được Sửa</th>
                 </tr>
               </thead>
               <tbody id="permissions-matrix-tbody" class="divide-y divide-slate-100 text-sm"></tbody>
@@ -840,8 +889,8 @@
   <!-- ===================================================================== -->
 
   <!-- 1. Product Add/Edit Modal -->
-  <div id="product-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+  <div id="product-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 id="product-modal-title" class="font-extrabold text-base text-slate-900">Thêm Hàng hóa mới</h3>
         <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
@@ -906,8 +955,8 @@
   </div>
 
   <!-- 2. Inventory Ledger (Thẻ kho) Modal -->
-  <div id="ledger-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl space-y-4">
+  <div id="ledger-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 id="ledger-modal-title" class="font-extrabold text-base text-slate-900">Thẻ kho sản phẩm</h3>
         <button onclick="closeLedgerModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
@@ -955,8 +1004,8 @@
   </div>
 
   <!-- 3. Invoice Detail & Print Receipt Modal -->
-  <div id="invoice-detail-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+  <div id="invoice-detail-modal" class="hidden fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 shadow-xl space-y-4">
       <div id="invoice-receipt-printable" class="p-4 rounded-xl border border-slate-200 bg-white"></div>
       <div class="flex items-center justify-end gap-2 pt-2">
         <button onclick="closeInvoiceDetailModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">
@@ -1162,7 +1211,7 @@
 
   <!-- 11. Full-Screen Authentication / Login Gate -->
   <div id="login-overlay" class="hidden fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-5 sm:space-y-6">
       <div class="text-center space-y-2">
         <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md">
           T

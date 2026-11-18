@@ -266,9 +266,12 @@ function applyAuthUI() {
   const nameEl = document.getElementById("header-user-name");
   const roleEl = document.getElementById("header-user-role");
   if (badge && nameEl && roleEl) {
-    badge.classList.remove("hidden");
     nameEl.textContent = u.full_name;
     roleEl.textContent = ROLE_LABELS[u.role] || u.role;
+  }
+  const roleMobEl = document.getElementById("header-user-role-mobile");
+  if (roleMobEl) {
+    roleMobEl.textContent = ROLE_LABELS[u.role] || u.role;
   }
 
   // Show/hide navigation tabs according to view permissions
@@ -366,6 +369,10 @@ function applyLanguageUI() {
   const langBtn = document.getElementById("lang-toggle-label");
   if (langBtn) {
     langBtn.textContent = state.lang === "vi" ? "VI 🇻🇳" : "EN 🇺🇸";
+  }
+  const langBtnMob = document.getElementById("lang-toggle-label-mobile");
+  if (langBtnMob) {
+    langBtnMob.textContent = state.lang === "vi" ? "VI" : "EN";
   }
 }
 
@@ -908,29 +915,29 @@ function renderPosProductGrid() {
       return `
         <div onclick="addToCart(${p.id}, 1)" class="group cursor-pointer bg-white rounded-xl border ${
           inCartQty > 0 ? "border-indigo-600 ring-2 ring-indigo-500/20" : "border-slate-200 hover:border-indigo-400"
-        } p-3.5 shadow-sm hover:shadow-md transition flex flex-col justify-between relative">
+        } p-2.5 sm:p-3.5 shadow-xs hover:shadow-md transition flex flex-col justify-between relative">
           ${
             inCartQty > 0
               ? `<span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">x${inCartQty}</span>`
               : ""
           }
-          <div class="flex items-start gap-3">
-            <div class="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-lg flex items-center justify-center shrink-0">
+          <div class="flex items-start gap-2 sm:gap-3">
+            <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-base sm:text-lg flex items-center justify-center shrink-0">
               ${p.image_url ? `<img src="${p.image_url}" class="w-full h-full object-cover rounded-xl"/>` : initial}
             </div>
             <div class="min-w-0 flex-1">
-              <div class="font-semibold text-slate-800 text-sm leading-snug line-clamp-2 group-hover:text-indigo-600 transition">
+              <div class="font-semibold text-slate-800 text-xs sm:text-sm leading-snug line-clamp-2 group-hover:text-indigo-600 transition">
                 ${displayProductName(p)}
               </div>
-              <div class="text-xs text-slate-400 mt-0.5 truncate">${p.barcode || p.category_name || ""}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5 truncate">${p.barcode || p.category_name || ""}</div>
             </div>
           </div>
-          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-1">
             <div>
-              <span class="font-bold text-indigo-600 text-sm">${formatVnd(p.price)}</span>
-              ${p.unit ? `<span class="text-xs text-slate-400">/${p.unit}</span>` : ""}
+              <span class="font-bold text-indigo-600 text-xs sm:text-sm">${formatVnd(p.price)}</span>
+              ${p.unit ? `<span class="text-[11px] text-slate-400">/${p.unit}</span>` : ""}
             </div>
-            <span class="text-xs px-2 py-0.5 rounded-full font-medium ${
+            <span class="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium ${
               p.stock <= 0
                 ? "bg-red-50 text-red-600"
                 : isLow
@@ -1083,11 +1090,23 @@ function renderPosCartTotals() {
   document.getElementById("pos-subtotal-val").textContent = formatVnd(subtotal);
   document.getElementById("pos-payable-val").textContent = formatVnd(payable);
 
+  const mobCount = document.getElementById("pos-mobile-bar-count");
+  const mobTotal = document.getElementById("pos-mobile-bar-total");
+  if (mobCount) mobCount.textContent = `${formatNumber(totalQty)} món`;
+  if (mobTotal) mobTotal.textContent = formatVnd(payable);
+
   const checkoutBtn = document.getElementById("pos-checkout-submit-btn");
   if (checkoutBtn) {
     checkoutBtn.disabled = items.length === 0;
   }
   updatePosVietQrPreview();
+}
+
+function scrollToMobileCart() {
+  const panel = document.getElementById("pos-cart-panel");
+  if (panel) {
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 async function updatePosVietQrPreview() {
@@ -2368,9 +2387,12 @@ function renderPermissionsMatrix() {
 
     return `
       <tr class="hover:bg-slate-50 transition">
-        <td class="py-3.5 px-5 font-bold text-slate-800">${mod.name}</td>
-        <td class="py-3.5 px-5 text-xs text-slate-500">${mod.desc}</td>
-        <td class="py-3.5 px-4 text-center">
+        <td class="py-3 px-3 sm:px-5">
+          <div class="font-bold text-slate-800 text-xs sm:text-sm">${mod.name}</div>
+          <div class="sm:hidden text-[11px] text-slate-500 mt-0.5 leading-snug">${mod.desc}</div>
+        </td>
+        <td class="hidden sm:table-cell py-3.5 px-5 text-xs text-slate-500">${mod.desc}</td>
+        <td class="py-3 px-2 sm:px-4 text-center">
           <input
             type="checkbox"
             ${p.view ? "checked" : ""}
@@ -2379,7 +2401,7 @@ function renderPermissionsMatrix() {
             class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
           />
         </td>
-        <td class="py-3.5 px-4 text-center">
+        <td class="py-3 px-2 sm:px-4 text-center">
           <input
             type="checkbox"
             ${p.edit ? "checked" : ""}
