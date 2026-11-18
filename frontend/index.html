@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -217,7 +218,7 @@
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <h3 class="text-sm font-bold text-slate-800" data-i18n="overview_table_title">Báo cáo chi tiết theo ngày</h3>
-          <a href="/api/reports/export-excel" class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition">
+          <a href="/api/reports/export-excel" onclick="handleExportExcelClick(event)" class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition">
             📥 Xuất Excel
           </a>
         </div>
@@ -633,6 +634,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <a
               href="/api/reports/export-excel"
+              onclick="handleExportExcelClick(event)"
               class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold text-center shadow-sm transition"
               data-i18n="more_export_excel"
             >
@@ -670,6 +672,7 @@
           <div class="pt-1">
             <a
               href="/api/backup/download-db"
+              onclick="handleDownloadDbClick(event)"
               class="inline-block py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition"
               data-i18n="more_db_download"
             >
@@ -995,7 +998,8 @@
     </div>
   </div>
 
-  <script src="/i18n.js"></script>
-  <script src="/app.js"></script>
+  <script src="./i18n.js"></script>
+  <script src="./browser_db.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>

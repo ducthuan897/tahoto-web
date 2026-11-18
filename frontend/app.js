@@ -128,21 +128,53 @@ function showToast(message, type = "success") {
   }, 3200);
 }
 
+let isStaticPagesMode = window.location.hostname.endsWith("github.io");
+
 async function apiFetch(url, options = {}) {
+  if (isStaticPagesMode && window.TAHOTO_BROWSER_DB) {
+    return window.TAHOTO_BROWSER_DB.handleLocalApi(url, options);
+  }
   const headers = options.headers || {};
   if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-  const res = await fetch(url, { ...options, headers });
-  if (!res.ok) {
-    let errMsg = `HTTP ${res.status}`;
-    try {
-      const errData = await res.json();
-      errMsg = errData.detail || errMsg;
-    } catch (_) {}
-    throw new Error(errMsg);
+  try {
+    const res = await fetch(url, { ...options, headers });
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.ok) {
+      if ((res.status === 404 || res.status === 405) && !contentType.includes("application/json") && window.TAHOTO_BROWSER_DB) {
+        isStaticPagesMode = true;
+        return window.TAHOTO_BROWSER_DB.handleLocalApi(url, options);
+      }
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const errData = await res.json();
+        errMsg = errData.detail || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+    return res.json();
+  } catch (err) {
+    if (window.TAHOTO_BROWSER_DB && (err instanceof TypeError || String(err.message).includes("Failed to fetch"))) {
+      isStaticPagesMode = true;
+      return window.TAHOTO_BROWSER_DB.handleLocalApi(url, options);
+    }
+    throw err;
   }
-  return res.json();
+}
+
+function handleExportExcelClick(e) {
+  if (isStaticPagesMode && window.TAHOTO_BROWSER_DB) {
+    e.preventDefault();
+    window.TAHOTO_BROWSER_DB.exportExcelInBrowser();
+  }
+}
+
+function handleDownloadDbClick(e) {
+  if (isStaticPagesMode && window.TAHOTO_BROWSER_DB) {
+    e.preventDefault();
+    window.TAHOTO_BROWSER_DB.downloadBrowserDbBackup();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1864,15 +1896,20 @@ async function handleExcelUpload(inputEl) {
   const file = inputEl.files?.[0];
   if (!file) return;
   const conflictMode = document.getElementById("excel-conflict-mode")?.value || "update";
-  const formData = new FormData();
-  formData.append("file", file);
 
   try {
     showToast("Đang xử lý tệp Excel...");
-    const res = await apiFetch(`/api/reports/import-excel?conflict_mode=${conflictMode}`, {
-      method: "POST",
-      body: formData,
-    });
+    let res;
+    if (isStaticPagesMode && window.TAHOTO_BROWSER_DB) {
+      res = await window.TAHOTO_BROWSER_DB.importExcelInBrowser(file, conflictMode);
+    } else {
+      const formData = new FormData();
+      formData.append("file", file);
+      res = await apiFetch(`/api/reports/import-excel?conflict_mode=${conflictMode}`, {
+        method: "POST",
+        body: formData,
+      });
+    }
     const s = res.stats;
     showToast(
       `Nhập Excel thành công! SP mới: ${s.products_added}, Cập nhật: ${s.products_updated}, KH: ${s.customers_imported}, Công nợ: ${s.debts_imported}`
