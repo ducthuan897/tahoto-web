@@ -2067,6 +2067,11 @@ function renderMoreSettings() {
     document.getElementById("more-db-engine-label").textContent = state.systemInfo.database_engine;
   }
 
+  const userMgmtCard = document.getElementById("more-user-management-card");
+  if (userMgmtCard) {
+    userMgmtCard.classList.toggle("hidden", !canView("users"));
+  }
+
   if (window.TAHOTO_SUPABASE) {
     const cfg = window.TAHOTO_SUPABASE.getConfig();
     const urlInput = document.getElementById("supabase-url-input");
@@ -2323,24 +2328,31 @@ function renderUsersList() {
           }"
         >
           <div class="min-w-0">
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-1.5">
               <span class="font-bold text-slate-900 text-sm">${u.full_name}</span>
               <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${roleBadge}">
                 ${ROLE_LABELS[u.role] || u.role}
               </span>
-              ${!u.is_active ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600">Đã khóa</span>` : ""}
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                u.is_active !== false ? "bg-emerald-50 text-emerald-700" : "bg-red-100 text-red-600"
+              }">
+                ${u.is_active !== false ? "Hoạt động" : "Đang khóa"}
+              </span>
             </div>
-            <div class="text-xs text-slate-500 mt-0.5 font-mono">@${u.username}</div>
+            <div class="text-xs text-slate-500 mt-0.5 font-mono">Tài khoản: @${u.username}</div>
           </div>
           ${
             canEditUsers
-              ? `<div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
-                  <button onclick="openUserModal(${u.id})" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-xs font-semibold text-slate-700">
-                    Sửa
+              ? `<div class="flex flex-wrap items-center justify-end gap-1.5 shrink-0" onclick="event.stopPropagation()">
+                  <button onclick="openUserModal(${u.id})" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-xs font-semibold text-indigo-700">
+                    Sửa / Đổi MK
                   </button>
                   ${
                     u.role !== "manager"
-                      ? `<button onclick="deleteUserAccount(${u.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-600">
+                      ? `<button onclick="toggleUserActiveStatus(${u.id})" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-700">
+                          ${u.is_active !== false ? "Khóa" : "Mở khóa"}
+                        </button>
+                        <button onclick="deleteUserAccount(${u.id})" class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-xs font-semibold text-red-600">
                           Xóa
                         </button>`
                       : ""
@@ -2542,6 +2554,22 @@ async function submitUserForm(e) {
       state.selectedUserIdForPerms = created.id;
     }
     closeUserModal();
+    await refreshUsersAndPermissions();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function toggleUserActiveStatus(userId) {
+  const u = state.users.find((x) => x.id === userId);
+  if (!u || u.role === "manager") return;
+  try {
+    const nextActive = u.is_active === false;
+    await apiFetch(`/api/users/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify({ is_active: nextActive }),
+    });
+    showToast(nextActive ? `Đã mở khóa tài khoản @${u.username}` : `Đã tạm khóa tài khoản @${u.username}`);
     await refreshUsersAndPermissions();
   } catch (err) {
     showToast(err.message, "error");

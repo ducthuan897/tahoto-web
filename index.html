@@ -98,7 +98,7 @@
 
         <!-- Mobile User Profile & Language Actions -->
         <div class="flex sm:hidden items-center gap-1.5 shrink-0">
-          <div id="header-user-badge-mobile" class="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[11px]">
+          <div id="header-user-badge-mobile" onclick="if(canView('users')) switchTab('users')" class="cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[11px]">
             <span id="header-user-role-mobile" class="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700"></span>
           </div>
           <button onclick="toggleLanguage()" class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700">
@@ -150,7 +150,7 @@
 
       <!-- Desktop Language & User Account Profile -->
       <div class="hidden sm:flex items-center gap-2 shrink-0">
-        <div id="header-user-badge" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs">
+        <div id="header-user-badge" onclick="if(canView('users')) switchTab('users')" title="Quản lý Nhân sự & Phân quyền" class="cursor-pointer hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 border border-slate-200 text-xs transition">
           <span id="header-user-name" class="font-bold text-slate-800 max-w-[120px] truncate"></span>
           <span id="header-user-role" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700"></span>
         </div>
@@ -797,6 +797,35 @@
           </button>
         </div>
         <div id="bank-accounts-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+
+      <!-- User Management & Permissions Card in Settings -->
+      <div id="more-user-management-card" class="bg-white p-6 rounded-2xl border border-indigo-200 bg-indigo-50/20 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">🛡️</div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">Quản lý Tài khoản Nhân sự & Phân quyền (Quản lý / Tổ trưởng / Thu ngân)</h3>
+            <p class="text-xs text-slate-600 mt-0.5">
+              Thêm mới, đổi mật khẩu, khóa tài khoản và tích chọn bảng phân quyền 2 cột (Được Xem / Được Sửa) cho từng nhân viên.
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            onclick="openUserModal()"
+            class="px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-700 text-xs font-bold transition"
+          >
+            + Thêm User mới
+          </button>
+          <button
+            type="button"
+            onclick="switchTab('users')"
+            class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition"
+          >
+            Mở Bảng Quản lý & Phân quyền User →
+          </button>
+        </div>
       </div>
 
       <!-- Store & Support Info -->
