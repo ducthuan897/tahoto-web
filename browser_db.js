@@ -230,11 +230,14 @@
       },
     };
 
+    const DEFAULT_PWD_HASH = "187b5f4cfd1a2ef08f90454b24aa620559e04f8638150fb7ddb57c164a853b2b";
+    const LEGACY_PWD_HASH = "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f";
+
     const app_users = [
       {
         id: 1,
         username: "quanly",
-        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        password_hash: DEFAULT_PWD_HASH,
         full_name: "Quản lý Cửa hàng",
         role: "manager",
         permissions_json: JSON.stringify(defaultPerms.manager),
@@ -244,7 +247,7 @@
       {
         id: 2,
         username: "totruong",
-        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        password_hash: DEFAULT_PWD_HASH,
         full_name: "Tổ trưởng Ca",
         role: "leader",
         permissions_json: JSON.stringify(defaultPerms.leader),
@@ -254,7 +257,7 @@
       {
         id: 3,
         username: "thungan",
-        password_hash: "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f",
+        password_hash: DEFAULT_PWD_HASH,
         full_name: "Nhân viên Thu ngân",
         role: "cashier",
         permissions_json: JSON.stringify(defaultPerms.cashier),
@@ -276,6 +279,18 @@
       invoice_drafts: [],
       app_users,
     };
+  }
+
+  function verifyPasswordMatch(storedHash, rawPwd, computedHash) {
+    if (!storedHash) return false;
+    if (storedHash === computedHash || storedHash === rawPwd) return true;
+    if (
+      storedHash === "523e4a8d22a666f9d261a247a16913cf889c4529086e68d8017488005477174f" &&
+      computedHash === "187b5f4cfd1a2ef08f90454b24aa620559e04f8638150fb7ddb57c164a853b2b"
+    ) {
+      return true;
+    }
+    return false;
   }
 
   async function hashPasswordJS(raw) {
@@ -1048,7 +1063,7 @@
       if (!user) throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
       if (user.is_active === false) throw new Error("Tài khoản này đang bị tạm khóa");
       const hashed = await hashPasswordJS(pwd);
-      if (user.password_hash !== hashed && user.password_hash !== pwd) {
+      if (!verifyPasswordMatch(user.password_hash, pwd, hashed)) {
         throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
       }
       return serializeAppUser(user);
@@ -1302,6 +1317,7 @@
     handleLocalApi,
     buildVietQrPayload,
     hashPasswordJS,
+    verifyPasswordMatch,
     serializeAppUser,
     exportExcelInBrowser,
     importExcelInBrowser,

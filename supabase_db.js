@@ -821,7 +821,7 @@
           const user = rows[0];
           if (user.is_active === false) throw new Error("Tài khoản này đang bị tạm khóa");
           const hashed = await window.TAHOTO_BROWSER_DB.hashPasswordJS(pwd);
-          if (user.password_hash !== hashed && user.password_hash !== pwd) {
+          if (!window.TAHOTO_BROWSER_DB.verifyPasswordMatch(user.password_hash, pwd, hashed)) {
             throw new Error("Tên đăng nhập hoặc mật khẩu không chính xác");
           }
           return window.TAHOTO_BROWSER_DB.serializeAppUser(user);
